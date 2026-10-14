@@ -4,9 +4,13 @@ name: MIeL monitor
 # con TUS Secrets. El resto de las carpetas viene con la plantilla pero no se usa.
 on:
   schedule:
-    # Cada 30 min de 8 a 22 h de Argentina (GitHub usa UTC = ART + 3). ~900 min/mes de los 2000 gratis.
-    # GitHub puede atrasar o saltear corridas en horas pico.
+    # GitHub usa UTC (= hora de Argentina + 3) y puede atrasar o saltear corridas en horas pico.
+    # Normal: cada 30 min de 8 a 22 h (~900 min/mes de los 2000 gratis).
+    # Con la variable CRON_EXTERNO=true (README, "Avisos más rápidos") éste se saltea y dispara cron-job.org.
     - cron: "17,47 0,1,11-23 * * *"
+    # Respaldo, siempre activo: hábiles 10:37 y 18:37, fines de semana 13:37.
+    - cron: "37 13,21 * * 1-5"
+    - cron: "37 16 * * 0,6"
   workflow_dispatch:
     inputs:
       dump:
@@ -22,7 +26,10 @@ concurrency:
 jobs:
   check:
     # En el repo original no hay credenciales: sólo corre en las copias.
-    if: github.repository != 'tinoamato/miel-monitor'
+    # Un job salteado no consume minutos.
+    if: >-
+      github.repository != 'tinoamato/miel-monitor' &&
+      !(vars.CRON_EXTERNO == 'true' && github.event.schedule == '17,47 0,1,11-23 * * *')
     uses: tinoamato/miel-monitor/.github/workflows/run.yml@v1
     with:
       dump: ${{ inputs.dump == true }}

@@ -47,6 +47,8 @@ Pestaña **Actions** → **MIeL monitor** → **Run workflow** → **Run workflo
 
 Listo. Desde ahora revisa cada 30 minutos, de 8 a 22 h, y sólo te avisa cuando hay algo nuevo. La primera corrida registra lo que ya existe sin avisarte, para no mandarte 80 mensajes viejos.
 
+¿Querés que revise cada 12 minutos y en horario exacto? Mirá [Opcional: avisos más rápidos](#opcional-avisos-más-rápidos-cada-12-min).
+
 ### Problemas comunes
 
 | Síntoma | Solución |
@@ -55,6 +57,7 @@ Listo. Desde ahora revisa cada 30 minutos, de 8 a 22 h, y sólo te avisa cuando 
 | *"RELAY_KEY o TELEGRAM_CHAT_ID inválidos"* | Volvé a mandarle `/start` al bot y copiá los valores de nuevo |
 | Te llega *"MIeL monitor falló: login"* | Revisá `MIEL_USER`/`MIEL_PASS`. Si cambiaste la contraseña de MIeL, actualizá el secret |
 | No corre solo | GitHub a veces atrasa los horarios automáticos. Si pasan horas sin correr, revisá que Actions esté habilitado |
+| Con cron-job.org, la tarea da **401** o **404** | Venció el token o la URL tiene mal el usuario o repo. Revisá el paso 1 de "Avisos más rápidos" |
 
 ### Para dejar de usarlo
 
@@ -63,6 +66,55 @@ Borrá tu repo (**Settings** → **Delete this repository**). Con eso se borran 
 ### Opcional: tu propio bot
 
 Si no querés que los avisos pasen por el bot compartido: creá un bot con **@BotFather** (`/newbot`), mandale `/start` y agregá el secret `TELEGRAM_BOT_TOKEN` con su token. Tu `TELEGRAM_CHAT_ID` te lo da **@userinfobot**. Con ese secret cargado, `RELAY_KEY` no hace falta.
+
+### Opcional: avisos más rápidos (cada 12 min)
+
+El horario automático de GitHub es "mejor esfuerzo": atrasa o saltea corridas. Con [cron-job.org](https://cron-job.org) (gratis), tu monitor corre puntual y más seguido:
+
+| Tarea | Días | Horas | Minutos | Corridas por día |
+|---|---|---|---|---|
+| Día hábil | Lunes a viernes | `8-20` | `7,19,31,43,55` (cada 12 min) | 65 |
+| Fin de semana | Sábado y domingo | `9-20` | `7,37` (cada 30 min) | 24 |
+| Tarde-noche | Todos los días | `6,21,22,23` | `7` | 4 |
+
+Usa unos 1.800 de los 2.000 minutos gratis por mes. GitHub sigue corriendo 2 veces por día como respaldo.
+
+**1. Token de GitHub**
+
+1. Entrá a [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new).
+2. **Token name:** `miel cron`. **Expiration:** la más larga que te deje (anotá la fecha).
+3. **Repository access** → *Only select repositories* → elegí **tu** repo del monitor.
+4. **Permissions** → *Repository permissions* → **Actions: Read and write**. No hace falta nada más.
+5. **Generate token** y copialo (empieza con `github_pat_`). Sólo sirve para disparar el monitor de ese repo.
+
+**2. Las 3 tareas en cron-job.org**
+
+Creá una cuenta en [cron-job.org](https://cron-job.org) → **Create cronjob**:
+
+- **URL:** `https://api.github.com/repos/TU_USUARIO/TU_REPO/actions/workflows/monitor.yml/dispatches`. Reemplazá `TU_USUARIO/TU_REPO` por los de tu copia, tal como aparecen en la barra del navegador.
+- **Execution schedule** → *Custom*: los valores de la fila "Día hábil" de la tabla.
+- Pestaña **Advanced**:
+  - **Time zone:** `America/Argentina/Buenos_Aires`
+  - **Request method:** `POST`
+  - **Headers** (agregá los 3):
+    - `Authorization` = `Bearer github_pat_…` (tu token)
+    - `Accept` = `application/vnd.github+json`
+    - `X-GitHub-Api-Version` = `2022-11-28`
+  - **Request body:** `{"ref":"main"}`
+- Guardá y tocá **Test run**. Tiene que responder **204**, y en la pestaña **Actions** de tu repo aparece una corrida nueva.
+
+Duplicá la tarea (**⋮ → Clone**) dos veces y cambiale el horario a cada copia: una con la fila "Fin de semana" y otra con "Tarde-noche".
+
+**3. Apagá el horario de 30 min de GitHub**
+
+Si no lo apagás, se suman los dos horarios y te pasás de los minutos gratis. En tu repo: **Settings** → **Secrets and variables** → **Actions** → pestaña **Variables** → **New repository variable**:
+
+- **Name:** `CRON_EXTERNO`
+- **Value:** `true`
+
+**Cuando venza el token**, generá uno nuevo y reemplazalo en las 3 tareas. Mientras tanto el monitor sigue andando, pero sólo con el respaldo de GitHub (2 veces por día).
+
+**Para volver al modo normal**, borrá la variable `CRON_EXTERNO` y pausá las tareas de cron-job.org.
 
 ### Seguridad: fijar la versión
 
