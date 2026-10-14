@@ -1,0 +1,29 @@
+name: MIeL monitor
+
+# Este es el único archivo que importa en tu copia: llama al código de tinoamato/miel-monitor@v1
+# con TUS Secrets. El resto de las carpetas viene con la plantilla pero no se usa.
+on:
+  schedule:
+    # Cada 30 min de 8 a 22 h de Argentina (GitHub usa UTC = ART + 3). ~900 min/mes de los 2000 gratis.
+    # GitHub puede atrasar o saltear corridas en horas pico.
+    - cron: "17,47 0,1,11-23 * * *"
+  workflow_dispatch:
+    inputs:
+      dump:
+        description: "Guardar HTML + screenshots como artifact (diagnóstico)"
+        type: boolean
+        default: false
+
+# Evita dos corridas simultáneas pisándose el estado.
+concurrency:
+  group: miel-monitor
+  cancel-in-progress: false
+
+jobs:
+  check:
+    # En el repo original no hay credenciales: sólo corre en las copias.
+    if: github.repository != 'tinoamato/miel-monitor'
+    uses: tinoamato/miel-monitor/.github/workflows/run.yml@v1
+    with:
+      dump: ${{ inputs.dump == true }}
+    secrets: inherit

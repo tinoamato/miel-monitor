@@ -1,0 +1,79 @@
+name: MIeL monitor (reutilizable)
+
+# Lo llama .github/workflows/monitor.yml desde el repo privado de cada persona.
+# Corre con los Secrets y la caché de ESE repo: las credenciales nunca salen de su cuenta.
+# El código se baja de este repo en la versión `ref`, así los arreglos le llegan a todos al mover el tag v1.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Versión del código (tag o SHA)"
+        type: string
+        default: v1
+      dump:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      TZ: America/Argentina/Buenos_Aires
+      # Chrome ya viene instalado en ubuntu-latest: no hace falta `playwright install`.
+      MIEL_BROWSER_CHANNEL: chrome
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: tinoamato/miel-monitor
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Clave nueva por corrida (las entradas de caché son inmutables); se restaura la última por prefijo.
+      - name: Restaurar estado
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache/state.json
+          key: miel-state-${{ github.run_id }}
+          restore-keys: miel-state-
+
+      - name: Revisar MIeL
+        run: npm start -- ${{ inputs.dump && '--dump' || '' }}
+        env:
+          MIEL_USER: ${{ secrets.MIEL_USER }}
+          MIEL_PASS: ${{ secrets.MIEL_PASS }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RELAY_KEY: ${{ secrets.RELAY_KEY }}
+          # URL del Worker de relay (ADMIN.md, paso 2).
+          TELEGRAM_RELAY_URL: https://miel-relay.tinoo-amato.workers.dev
+          # Opcional: bot propio en vez del compartido.
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          MIEL_SEL_COURSE_BLOCKS: ${{ vars.MIEL_SEL_COURSE_BLOCKS }}
+          MIEL_SEL_MESSAGE_ITEMS: ${{ vars.MIEL_SEL_MESSAGE_ITEMS }}
+          MIEL_SEL_PORTFOLIO_ITEMS: ${{ vars.MIEL_SEL_PORTFOLIO_ITEMS }}
+          MIEL_ONLY_WITH_BADGES: ${{ vars.MIEL_ONLY_WITH_BADGES }}
+
+      - name: Guardar estado
+        if: always() && hashFiles('.cache/state.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .cache/state.json
+          key: miel-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Subir diagnóstico
+        if: failure() || inputs.dump
+        uses: actions/upload-artifact@v4
+        with:
+          name: miel-debug-${{ github.run_id }}
+          path: .cache/debug/
+          retention-days: 3
+          if-no-files-found: ignore

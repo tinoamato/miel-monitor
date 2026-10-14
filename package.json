@@ -1,0 +1,26 @@
+{
+  "name": "miel-script",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monitor de novedades de MIeL (UNLaM) con alertas por Telegram",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "headed": "tsx src/index.ts --headed --dump --dry-run",
+    "dry": "tsx src/index.ts --dry-run",
+    "test:telegram": "tsx src/index.ts --test-telegram",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.7",
+    "playwright": "^1.64.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
